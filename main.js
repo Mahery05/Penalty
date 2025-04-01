@@ -1,157 +1,117 @@
 import * as THREE from 'https://esm.sh/three@0.150.1';
 import { GLTFLoader } from 'https://esm.sh/three@0.150.1/examples/jsm/loaders/GLTFLoader.js';
+import { OrbitControls } from 'https://esm.sh/three@0.150.1/examples/jsm/controls/OrbitControls.js';
 
-let scene, camera, renderer;
-let ball, goal, cursor, cursorX = 0;
-let ballVelocity = new THREE.Vector3();
-let state = 'aim';
-let score = { team1: 0, team2: 0 };
-let currentTeam = 'team1';
-let attempts = 0;
-
-let playerMixer, goalieMixer;
+let scene, camera, renderer, controls;
+let ball, cursor, ballVelocity = new THREE.Vector3();
 let playerModel, goalieModel;
-let playerIdleAnim, playerKickAnim;
-let goalieLeft, goalieRight, goalieIdle;
+let playerMixer, goalieMixer;
+let kickAnim, goalieIdleAnim, goalieLeftAnim, goalieRightAnim, celebrateAnim;
+let state = 'aim';
+let cursorX = 0;
+let hasCelebrated = false;
 
 const clock = new THREE.Clock();
+const textureLoader = new THREE.TextureLoader();
 
-window.addEventListener('DOMContentLoaded', () => {
-  createUI();
-  init();
-  animate();
-});
-
-function createUI() {
-  const ui = document.createElement('div');
-  ui.id = 'scoreboard';
-  ui.innerHTML = `
-    <style>
-      #scoreboard {
-        position: absolute;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-family: sans-serif;
-        color: white;
-        text-align: center;
-      }
-      .team {
-        margin: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-      }
-      .dot {
-        width: 12px;
-        height: 12px;
-        border-radius: 50%;
-        background: grey;
-        display: inline-block;
-      }
-      .dot.scored { background: lime; }
-      .dot.missed { background: red; }
-    </style>
-    <div class="team" id="team1">
-      <strong>Modena</strong>
-      ${'<span class="dot"></span>'.repeat(5)}
-    </div>
-    <div class="team" id="team2">
-      <strong>Juventus</strong>
-      ${'<span class="dot"></span>'.repeat(5)}
-    </div>
-  `;
-  document.body.appendChild(ui);
-}
-
-function updateUI(success) {
-  const teamDots = document.querySelectorAll(`#${currentTeam} .dot`);
-  if (teamDots[attempts % 5]) {
-    teamDots[attempts % 5].classList.add(success ? 'scored' : 'missed');
-  }
-  if (success) score[currentTeam]++;
-  if ((attempts + 1) % 5 === 0) {
-    currentTeam = currentTeam === 'team1' ? 'team2' : 'team1';
-  }
-  attempts++;
-}
+init();
+animate();
 
 function init() {
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87ceeb);
+
+  // Skybox (simple light blue background)
+  scene.background = new THREE.Color(0xb3e0ff);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(2, 3, 10);
-  camera.lookAt(0, 1.5, -15);
+  camera.position.set(0, 2.5, 10);
+  camera.lookAt(0, 1.5, -20);
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
   document.body.appendChild(renderer.domElement);
 
-  scene.add(new THREE.AmbientLight(0x404040));
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(10, 10, 10);
-  scene.add(light);
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enablePan = false;
+  controls.enableZoom = false;
+  controls.target.set(0, 1.5, -20);
+  controls.update();
 
+  const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+  dirLight.position.set(5, 10, 5);
+  dirLight.castShadow = true;
+  scene.add(ambient, dirLight);
+
+  // === Terrain avec texture ===
+  const grassTex = textureLoader.load('textures/grass.jpg');
+  grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
+  grassTex.repeat.set(10, 10);
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(30, 50),
-    new THREE.MeshStandardMaterial({ color: 0x228B22 })
+    new THREE.PlaneGeometry(40, 60),
+    new THREE.MeshStandardMaterial({ map: grassTex })
   );
   ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
   scene.add(ground);
 
-  goal = new THREE.Mesh(
-    new THREE.BoxGeometry(8, 3, 0.2),
+  // === But ===
+  const goal = new THREE.Mesh(
+    new THREE.BoxGeometry(7, 3, 0.2),
     new THREE.MeshStandardMaterial({ color: 0xffffff })
   );
   goal.position.set(0, 1.5, -20);
   scene.add(goal);
 
+  // === Balle ===
+  const ballTex = textureLoader.load('textures/ballon.png');
   ball = new THREE.Mesh(
-    new THREE.SphereGeometry(0.3, 16, 16),
-    new THREE.MeshStandardMaterial({ color: 0xffffff })
+    new THREE.SphereGeometry(0.2, 32, 32),
+    new THREE.MeshStandardMaterial({ map: ballTex })
   );
-  ball.position.set(0, 0.2, 5);
-  ball.scale.set(0.3, 0.3, 0.3);
+  ball.position.set(0.1, 0.2, 3.8);
+  ball.castShadow = true;
   scene.add(ball);
 
+  // === Curseur ===
   cursor = new THREE.Mesh(
-    new THREE.TorusGeometry(0.3, 0.05, 8, 16),
-    new THREE.MeshStandardMaterial({ color: 0xffff00 })
+    new THREE.RingGeometry(0.3, 0.4, 32),
+    new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide })
   );
-  cursor.rotation.x = Math.PI / 2;
   cursor.position.set(0, 1.5, -19.9);
+  cursor.rotation.x = -Math.PI / 2;
   scene.add(cursor);
 
   const loader = new GLTFLoader();
-
   loader.load('models/Soccer Penalty Kick.glb', gltf => {
     playerModel = gltf.scene;
-    playerModel.position.set(0, 0, 6); // aligné avec la balle
+    playerModel.position.set(0, 0, 6);
     playerModel.rotation.y = Math.PI;
+    playerModel.traverse(o => o.castShadow = true);
     scene.add(playerModel);
     playerMixer = new THREE.AnimationMixer(playerModel);
-    playerKickAnim = playerMixer.clipAction(gltf.animations[0]);
-    playerKickAnim.setLoop(THREE.LoopOnce);
-    playerKickAnim.clampWhenFinished = true;
+    kickAnim = playerMixer.clipAction(gltf.animations[0]);
+    celebrateAnim = playerMixer.clipAction(gltf.animations[1] || gltf.animations[0]);
+    celebrateAnim.setLoop(THREE.LoopOnce);
+    celebrateAnim.clampWhenFinished = true;
   });
 
   loader.load('models/Goalkeeper Idle.glb', gltf => {
     goalieModel = gltf.scene;
     goalieModel.position.set(0, 0, -19.9);
+    goalieModel.traverse(o => o.castShadow = true);
     scene.add(goalieModel);
     goalieMixer = new THREE.AnimationMixer(goalieModel);
-    goalieIdle = goalieMixer.clipAction(gltf.animations[0]);
-    goalieIdle.play();
+    goalieIdleAnim = goalieMixer.clipAction(gltf.animations[0]);
+    goalieIdleAnim.play();
   });
 
   loader.load('models/Goalkeeper Diving Save Left.glb', gltf => {
-    goalieLeft = gltf.animations[0];
+    goalieLeftAnim = gltf.animations[0];
   });
-
   loader.load('models/Goalkeeper Diving Save Right.glb', gltf => {
-    goalieRight = gltf.animations[0];
+    goalieRightAnim = gltf.animations[0];
   });
 
   window.addEventListener('keydown', e => {
@@ -159,6 +119,8 @@ function init() {
       if (e.code === 'ArrowLeft') cursorX = Math.max(-3, cursorX - 0.5);
       if (e.code === 'ArrowRight') cursorX = Math.min(3, cursorX + 0.5);
       if (e.code === 'Space') playKick();
+    } else if (state === 'ready') {
+      reset();
     }
   });
 
@@ -173,54 +135,42 @@ function playKick() {
   if (state !== 'aim') return;
   state = 'shooting';
   cursor.visible = false;
+  hasCelebrated = false;
 
-  if (playerKickAnim && playerMixer) {
+  if (kickAnim && playerMixer) {
     playerMixer.stopAllAction();
-    playerKickAnim.reset().play();
-
-    // Délai pour que le tir parte pile à l'impact (700ms approx)
+    kickAnim.reset().play();
     setTimeout(() => {
-      launchBall();
+      ballVelocity.set((cursorX - ball.position.x) * 0.1, 0.02, -0.45);
     }, 700);
   }
 
-  const diveDir = ['left', 'center', 'right'][Math.floor(Math.random() * 3)];
-  if (diveDir !== 'center') playGoalieDive(diveDir);
-  else {
+  const dive = ['left', 'right', 'center'][Math.floor(Math.random() * 3)];
+  if (dive === 'center') {
     goalieMixer.stopAllAction();
-    goalieIdle?.reset().play();
-  }
-}
-
-function launchBall() {
-  ballVelocity.set((cursorX - ball.position.x) * 0.1, 0.1, -0.4);
-}
-
-function playGoalieDive(dir) {
-  if (!goalieMixer) return;
-  goalieMixer.stopAllAction();
-  const anim = dir === 'left' ? goalieLeft : goalieRight;
-  if (anim) {
-    const action = goalieMixer.clipAction(anim);
-    action.setLoop(THREE.LoopOnce);
-    action.clampWhenFinished = true;
-    action.reset().play();
-  }
-}
-
-function reset(success) {
-  updateUI(success);
-  setTimeout(() => {
-    ball.position.set(0, 0.2, 5);
-    ballVelocity.set(0, 0, 0);
-    cursorX = 0;
-    cursor.visible = true;
-    state = 'aim';
-    if (goalieIdle) {
+    goalieIdleAnim?.reset().play();
+  } else {
+    const anim = dive === 'left' ? goalieLeftAnim : goalieRightAnim;
+    if (anim) {
+      const action = goalieMixer.clipAction(anim);
       goalieMixer.stopAllAction();
-      goalieIdle.reset().play();
+      action.setLoop(THREE.LoopOnce);
+      action.clampWhenFinished = true;
+      action.reset().play();
     }
-  }, 1500);
+  }
+}
+
+function reset() {
+  ballVelocity.set(0, 0, 0);
+  ball.position.set(0.1, 0.2, 5.9);
+  ball.rotation.set(0, 0, 0);
+  cursorX = 0;
+  cursor.visible = true;
+  state = 'aim';
+  hasCelebrated = false;
+  goalieMixer.stopAllAction();
+  goalieIdleAnim?.reset().play();
 }
 
 function animate() {
@@ -229,15 +179,35 @@ function animate() {
   if (playerMixer) playerMixer.update(delta);
   if (goalieMixer) goalieMixer.update(delta);
 
-  if (ballVelocity.lengthSq() > 0.0001) {
+  if (state === 'shooting') {
     ball.position.add(ballVelocity);
     ballVelocity.multiplyScalar(0.98);
-    if (ball.position.z < -19.5) {
-      const hitX = ball.position.x;
-      const goalieX = goalieModel?.position?.x || 0;
-      const blocked = Math.abs(hitX - goalieX) < 1;
-      reset(!blocked);
-      state = 'reset';
+
+    // === Rotation de la balle pendant le mouvement ===
+    const rotationSpeed = 30;
+    ball.rotation.x += ballVelocity.length() * delta * rotationSpeed;
+    ball.rotation.y += ballVelocity.x * delta * rotationSpeed;
+
+    const goalieX = goalieModel?.position?.x || 0;
+    const hitX = ball.position.x;
+    const blocked = Math.abs(hitX - goalieX) < 1.2;
+    const isOnTarget = Math.abs(hitX) <= 3.5 && ball.position.y <= 2.5;
+
+    if (blocked && ball.position.z < -19.2 && ballVelocity.z < 0) {
+      ballVelocity.x += (Math.random() - 0.5) * 0.2;
+      ballVelocity.y = 0.05;
+      ballVelocity.z *= -0.3;
+    }
+
+    if (ball.position.z < -19.5 || ball.position.y < -1 || Math.abs(ball.position.x) > 10) {
+      ballVelocity.set(0, 0, 0);
+      state = 'ready';
+
+      if (!blocked && isOnTarget && !hasCelebrated) {
+        hasCelebrated = true;
+        playerMixer.stopAllAction();
+        celebrateAnim?.reset().play();
+      }
     }
   }
 
