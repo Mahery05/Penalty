@@ -22,8 +22,8 @@ function init() {
   scene.background = new THREE.Color(0xb3e0ff);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 1.6, 52);
-  camera.lookAt(0, 1.6, 40);
+  camera.position.set(6, 2, 38);
+  camera.lookAt(0, 1.6, 36.5);
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -33,7 +33,7 @@ function init() {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enablePan = false;
   controls.enableZoom = false;
-  controls.target.set(0, 1.6, 40);
+  controls.target.set(0, 1.6, 36.5);
   controls.update();
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.6);
@@ -59,7 +59,7 @@ function init() {
     new THREE.BoxGeometry(7, 3, 0.2),
     new THREE.MeshStandardMaterial({ color: 0xffffff })
   );
-  goal.position.set(0, -1, 36.5);
+  goal.position.set(100, -1, 36.5);
   goal.rotation.y = -Math.PI / 2;
   scene.add(goal);
 
@@ -68,7 +68,7 @@ function init() {
     new THREE.SphereGeometry(0.25, 32, 32),
     new THREE.MeshStandardMaterial({ map: ballTex })
   );
-  ball.position.set(0, -2.5, 36.5);
+  ball.position.set(-17, -2.5, 36.3);
   ball.castShadow = true;
   scene.add(ball);
 
@@ -83,7 +83,7 @@ function init() {
   const loader = new GLTFLoader();
   loader.load('models/Soccer Penalty Kick.glb', gltf => {
     playerModel = gltf.scene;
-    playerModel.position.set(4, -2.9, 36.5);
+    playerModel.position.set(-15, -2.9, 37);
     playerModel.rotation.y = -Math.PI / 2;
     playerModel.traverse(o => o.castShadow = true);
     scene.add(playerModel);
@@ -161,7 +161,7 @@ function playKick() {
 
 function reset() {
   ballVelocity.set(0, 0, 0);
-  ball.position.set(75, 0.2, 60);
+  ball.position.set(0, -2.5, 36.5);
   ball.rotation.set(0, 0, 0);
   cursorX = 0;
   cursor.visible = true;
