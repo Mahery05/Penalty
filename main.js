@@ -55,14 +55,6 @@ function init() {
     scene.add(field);
   });
 
-  const goal = new THREE.Mesh(
-    new THREE.BoxGeometry(7, 3, 0.2),
-    new THREE.MeshStandardMaterial({ color: 0xffffff })
-  );
-  goal.position.set(100, -1, 36.5);
-  goal.rotation.y = -Math.PI / 2;
-  scene.add(goal);
-
   const ballTex = textureLoader.load('textures/ballon.png');
   ball = new THREE.Mesh(
     new THREE.SphereGeometry(0.25, 32, 32),
@@ -139,7 +131,9 @@ function playKick() {
     playerMixer.stopAllAction();
     kickAnim.reset().play();
     setTimeout(() => {
-      ballVelocity.set(-0.45, 0.02, (cursorX - ball.position.z) * 0.1);
+      if (state === 'shooting') {
+        ballVelocity.set(1.5, 0.02, cursorX * 0.05); // vers le but
+      }
     }, 700);
   }
 
@@ -161,7 +155,7 @@ function playKick() {
 
 function reset() {
   ballVelocity.set(0, 0, 0);
-  ball.position.set(0, -2.5, 36.5);
+  ball.position.set(-17, -2.5, 36.2);
   ball.rotation.set(0, 0, 0);
   cursorX = 0;
   cursor.visible = true;
@@ -185,18 +179,18 @@ function animate() {
     ball.rotation.x += ballVelocity.length() * delta * rotationSpeed;
     ball.rotation.y += ballVelocity.z * delta * rotationSpeed;
 
-    const goalieZ = goalieModel?.position?.z || 0;
-    const hitZ = ball.position.z;
-    const blocked = Math.abs(hitZ - goalieZ) < 1.2;
-    const isOnTarget = Math.abs(hitZ - 60) <= 3.5 && ball.position.y <= 2.5;
+    const goalieX = goalieModel?.position?.x || 0;
+    const hitX = ball.position.x;
+    const blocked = Math.abs(hitX - goalieX) < 1.2;
+    const isOnTarget = Math.abs(ball.position.z - 36.5) <= 3.5 && ball.position.y <= 2.5;
 
-    if (blocked && ball.position.x < 60.5 && ballVelocity.x < 0) {
+    if (blocked && ball.position.x > goalieX && ballVelocity.x > 0) {
       ballVelocity.z += (Math.random() - 0.5) * 0.2;
       ballVelocity.y = 0.05;
       ballVelocity.x *= -0.3;
     }
 
-    if (ball.position.x < 59.5 || ball.position.y < -1 || Math.abs(ball.position.z - 60) > 10) {
+    if (ball.position.x > 30 || ball.position.y < -1 || Math.abs(ball.position.z - 36.5) > 10) {
       ballVelocity.set(0, 0, 0);
       state = 'ready';
 
@@ -208,6 +202,6 @@ function animate() {
     }
   }
 
-  cursor.position.z = 60 + cursorX;
+  cursor.position.z = 36.5 + cursorX;
   renderer.render(scene, camera);
 }
