@@ -22,8 +22,8 @@ function init() {
   scene.background = new THREE.Color(0xb3e0ff);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 4, 75);
-  camera.lookAt(0, 1.5, 60);
+  camera.position.set(0, 1.6, 52);
+  camera.lookAt(0, 1.6, 40);
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -33,7 +33,7 @@ function init() {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enablePan = false;
   controls.enableZoom = false;
-  controls.target.set(0, 1.5, 60);
+  controls.target.set(0, 1.6, 40);
   controls.update();
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.6);
@@ -42,11 +42,10 @@ function init() {
   dirLight.castShadow = true;
   scene.add(ambient, dirLight);
 
-  // === Terrain 3D (remplace le sol simple) ===
   const gltfLoader = new GLTFLoader();
   gltfLoader.load('models/football_field.glb', gltf => {
     const field = gltf.scene;
-    field.position.set(0, -0.01, 0); // terrain reste centré
+    field.position.set(0, -0.01, 0);
     field.rotation.y = Math.PI;
     field.scale.set(1, 1, 1);
     field.traverse(obj => {
@@ -56,38 +55,36 @@ function init() {
     scene.add(field);
   });
 
-  // === But ===
   const goal = new THREE.Mesh(
     new THREE.BoxGeometry(7, 3, 0.2),
     new THREE.MeshStandardMaterial({ color: 0xffffff })
   );
-  goal.position.set(0, 1.5, 60);
+  goal.position.set(0, -1, 36.5);
+  goal.rotation.y = -Math.PI / 2;
   scene.add(goal);
 
-  // === Balle ===
   const ballTex = textureLoader.load('textures/ballon.png');
   ball = new THREE.Mesh(
     new THREE.SphereGeometry(0.25, 32, 32),
     new THREE.MeshStandardMaterial({ map: ballTex })
   );
-  ball.position.set(0, 0.2, 65);
+  ball.position.set(0, -2.5, 36.5);
   ball.castShadow = true;
   scene.add(ball);
 
-  // === Curseur ===
   cursor = new THREE.Mesh(
     new THREE.RingGeometry(0.3, 0.4, 32),
     new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide })
   );
-  cursor.position.set(0, 1.5, 60);
+  cursor.position.set(0, 1.5, 36.5);
   cursor.rotation.x = -Math.PI / 2;
   scene.add(cursor);
 
   const loader = new GLTFLoader();
   loader.load('models/Soccer Penalty Kick.glb', gltf => {
     playerModel = gltf.scene;
-    playerModel.position.set(0, 0, 67);
-    playerModel.rotation.y = Math.PI;
+    playerModel.position.set(4, -2.9, 36.5);
+    playerModel.rotation.y = -Math.PI / 2;
     playerModel.traverse(o => o.castShadow = true);
     scene.add(playerModel);
     playerMixer = new THREE.AnimationMixer(playerModel);
@@ -99,7 +96,8 @@ function init() {
 
   loader.load('models/Goalkeeper Idle.glb', gltf => {
     goalieModel = gltf.scene;
-    goalieModel.position.set(0, 0, 60);
+    goalieModel.position.set(-22, -2.9, 36.5);
+    goalieModel.rotation.y = Math.PI / 2;
     goalieModel.traverse(o => o.castShadow = true);
     scene.add(goalieModel);
     goalieMixer = new THREE.AnimationMixer(goalieModel);
@@ -141,7 +139,7 @@ function playKick() {
     playerMixer.stopAllAction();
     kickAnim.reset().play();
     setTimeout(() => {
-      ballVelocity.set((cursorX - ball.position.x) * 0.1, 0.02, -0.45);
+      ballVelocity.set(-0.45, 0.02, (cursorX - ball.position.z) * 0.1);
     }, 700);
   }
 
@@ -163,7 +161,7 @@ function playKick() {
 
 function reset() {
   ballVelocity.set(0, 0, 0);
-  ball.position.set(0.1, 0.2, 5.9);
+  ball.position.set(75, 0.2, 60);
   ball.rotation.set(0, 0, 0);
   cursorX = 0;
   cursor.visible = true;
@@ -185,20 +183,20 @@ function animate() {
 
     const rotationSpeed = 30;
     ball.rotation.x += ballVelocity.length() * delta * rotationSpeed;
-    ball.rotation.y += ballVelocity.x * delta * rotationSpeed;
+    ball.rotation.y += ballVelocity.z * delta * rotationSpeed;
 
-    const goalieX = goalieModel?.position?.x || 0;
-    const hitX = ball.position.x;
-    const blocked = Math.abs(hitX - goalieX) < 1.2;
-    const isOnTarget = Math.abs(hitX) <= 3.5 && ball.position.y <= 2.5;
+    const goalieZ = goalieModel?.position?.z || 0;
+    const hitZ = ball.position.z;
+    const blocked = Math.abs(hitZ - goalieZ) < 1.2;
+    const isOnTarget = Math.abs(hitZ - 60) <= 3.5 && ball.position.y <= 2.5;
 
-    if (blocked && ball.position.z < -19.2 && ballVelocity.z < 0) {
-      ballVelocity.x += (Math.random() - 0.5) * 0.2;
+    if (blocked && ball.position.x < 60.5 && ballVelocity.x < 0) {
+      ballVelocity.z += (Math.random() - 0.5) * 0.2;
       ballVelocity.y = 0.05;
-      ballVelocity.z *= -0.3;
+      ballVelocity.x *= -0.3;
     }
 
-    if (ball.position.z < -19.5 || ball.position.y < -1 || Math.abs(ball.position.x) > 10) {
+    if (ball.position.x < 59.5 || ball.position.y < -1 || Math.abs(ball.position.z - 60) > 10) {
       ballVelocity.set(0, 0, 0);
       state = 'ready';
 
@@ -210,6 +208,6 @@ function animate() {
     }
   }
 
-  cursor.position.x = cursorX;
+  cursor.position.z = 60 + cursorX;
   renderer.render(scene, camera);
 }
