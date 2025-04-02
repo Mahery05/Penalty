@@ -19,13 +19,11 @@ animate();
 
 function init() {
   scene = new THREE.Scene();
-
-  // Skybox (simple light blue background)
   scene.background = new THREE.Color(0xb3e0ff);
 
   camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 2.5, 10);
-  camera.lookAt(0, 1.5, -20);
+  camera.position.set(0, 4, 75);
+  camera.lookAt(0, 1.5, 60);
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
@@ -35,7 +33,7 @@ function init() {
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enablePan = false;
   controls.enableZoom = false;
-  controls.target.set(0, 1.5, -20);
+  controls.target.set(0, 1.5, 60);
   controls.update();
 
   const ambient = new THREE.AmbientLight(0xffffff, 0.6);
@@ -44,33 +42,35 @@ function init() {
   dirLight.castShadow = true;
   scene.add(ambient, dirLight);
 
-  // === Terrain avec texture ===
-  const grassTex = textureLoader.load('textures/grass.jpg');
-  grassTex.wrapS = grassTex.wrapT = THREE.RepeatWrapping;
-  grassTex.repeat.set(10, 10);
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(40, 60),
-    new THREE.MeshStandardMaterial({ map: grassTex })
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.receiveShadow = true;
-  scene.add(ground);
+  // === Terrain 3D (remplace le sol simple) ===
+  const gltfLoader = new GLTFLoader();
+  gltfLoader.load('models/football_field.glb', gltf => {
+    const field = gltf.scene;
+    field.position.set(0, -0.01, 0); // terrain reste centré
+    field.rotation.y = Math.PI;
+    field.scale.set(1, 1, 1);
+    field.traverse(obj => {
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+    });
+    scene.add(field);
+  });
 
   // === But ===
   const goal = new THREE.Mesh(
     new THREE.BoxGeometry(7, 3, 0.2),
     new THREE.MeshStandardMaterial({ color: 0xffffff })
   );
-  goal.position.set(0, 1.5, -20);
+  goal.position.set(0, 1.5, 60);
   scene.add(goal);
 
   // === Balle ===
   const ballTex = textureLoader.load('textures/ballon.png');
   ball = new THREE.Mesh(
-    new THREE.SphereGeometry(0.2, 32, 32),
+    new THREE.SphereGeometry(0.25, 32, 32),
     new THREE.MeshStandardMaterial({ map: ballTex })
   );
-  ball.position.set(0.1, 0.2, 3.8);
+  ball.position.set(0, 0.2, 65);
   ball.castShadow = true;
   scene.add(ball);
 
@@ -79,14 +79,14 @@ function init() {
     new THREE.RingGeometry(0.3, 0.4, 32),
     new THREE.MeshBasicMaterial({ color: 0x00ff00, side: THREE.DoubleSide })
   );
-  cursor.position.set(0, 1.5, -19.9);
+  cursor.position.set(0, 1.5, 60);
   cursor.rotation.x = -Math.PI / 2;
   scene.add(cursor);
 
   const loader = new GLTFLoader();
   loader.load('models/Soccer Penalty Kick.glb', gltf => {
     playerModel = gltf.scene;
-    playerModel.position.set(0, 0, 6);
+    playerModel.position.set(0, 0, 67);
     playerModel.rotation.y = Math.PI;
     playerModel.traverse(o => o.castShadow = true);
     scene.add(playerModel);
@@ -99,7 +99,7 @@ function init() {
 
   loader.load('models/Goalkeeper Idle.glb', gltf => {
     goalieModel = gltf.scene;
-    goalieModel.position.set(0, 0, -19.9);
+    goalieModel.position.set(0, 0, 60);
     goalieModel.traverse(o => o.castShadow = true);
     scene.add(goalieModel);
     goalieMixer = new THREE.AnimationMixer(goalieModel);
@@ -183,7 +183,6 @@ function animate() {
     ball.position.add(ballVelocity);
     ballVelocity.multiplyScalar(0.98);
 
-    // === Rotation de la balle pendant le mouvement ===
     const rotationSpeed = 30;
     ball.rotation.x += ballVelocity.length() * delta * rotationSpeed;
     ball.rotation.y += ballVelocity.x * delta * rotationSpeed;
