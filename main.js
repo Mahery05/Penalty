@@ -68,7 +68,7 @@ function init() {
     new THREE.SphereGeometry(0.25, 32, 32),
     new THREE.MeshStandardMaterial({ map: ballTex })
   );
-  ball.position.set(-17, -2.5, 36.3);
+  ball.position.set(-17, -2.5, 36.2);
   ball.castShadow = true;
   scene.add(ball);
 
