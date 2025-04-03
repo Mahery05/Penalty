@@ -1,9 +1,11 @@
-
 import * as THREE from 'https://esm.sh/three@0.150.1';
 import { GLTFLoader } from 'https://esm.sh/three@0.150.1/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'https://esm.sh/three@0.150.1/examples/jsm/controls/OrbitControls.js';
+import { EffectComposer } from 'https://esm.sh/three@0.150.1/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'https://esm.sh/three@0.150.1/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'https://esm.sh/three@0.150.1/examples/jsm/postprocessing/UnrealBloomPass.js';
 
-let scene, camera, renderer, controls;
+let scene, camera, renderer, controls, composer;
 let ball, ballVelocity = new THREE.Vector3();
 let playerModel, goalieModel;
 let playerMixer, goalieMixer;
@@ -31,6 +33,11 @@ function init() {
   renderer.shadowMap.enabled = true;
   document.body.appendChild(renderer.domElement);
 
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.4, 0.4, 0.85);
+  composer.addPass(bloomPass);
+
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enablePan = false;
   controls.enableZoom = false;
@@ -56,9 +63,10 @@ function init() {
   });
 
   const ballTex = textureLoader.load('textures/ballon.png');
+  const bumpMap = textureLoader.load('textures/ballon_bump.jpg');
   ball = new THREE.Mesh(
     new THREE.SphereGeometry(0.25, 32, 32),
-    new THREE.MeshStandardMaterial({ map: ballTex })
+    new THREE.MeshStandardMaterial({ map: ballTex, bumpMap: bumpMap, bumpScale: 0.05 })
   );
   ball.position.set(-17.3, -2.5, 36.2);
   ball.castShadow = true;
@@ -111,6 +119,7 @@ function init() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    composer.setSize(window.innerWidth, window.innerHeight);
   });
 }
 
@@ -125,7 +134,7 @@ function playKick() {
 
     setTimeout(() => {
       if (state === 'shooting') {
-        ballVelocity.set(-1.5, 0.02, cursorX * 0.05);
+        ballVelocity.set(-1.5, 0.02, -cursorX * 0.05);
       }
     }, 700);
   }
@@ -169,7 +178,23 @@ function animate() {
     const rotationSpeed = 30;
     ball.rotation.x += ballVelocity.length() * delta * rotationSpeed;
     ball.rotation.y += ballVelocity.z * delta * rotationSpeed;
+
+    if (ball.position.x < -21.8 && ballVelocity.x < 0) {
+      ballVelocity.x *= -0.2;
+      ballVelocity.y = 0.03;
+      ballVelocity.z += (Math.random() - 0.5) * 0.1;
+    }
+
+    if (ball.position.x > -12.8 && ballVelocity.x > 0) {
+      ballVelocity.x *= -0.2;
+      ballVelocity.y = 0.03;
+      ballVelocity.z += (Math.random() - 0.5) * 0.1;
+    }
+
+    if (ball.position.y < -2.5 && ballVelocity.y < 0) {
+      ballVelocity.y *= -0.4;
+    }
   }
 
-  renderer.render(scene, camera);
+  composer.render();
 }
