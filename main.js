@@ -6,13 +6,14 @@ import { RenderPass } from 'https://esm.sh/three@0.150.1/examples/jsm/postproces
 import { UnrealBloomPass } from 'https://esm.sh/three@0.150.1/examples/jsm/postprocessing/UnrealBloomPass.js';
 
 let scene, camera, renderer, controls, composer;
-let ball, ballVelocity = new THREE.Vector3();
+let ball, glowBall, ballVelocity = new THREE.Vector3();
 let playerModel, goalieModel;
 let playerMixer, goalieMixer;
 let kickAnim, celebrateAnim, goalieIdleAnim, goalieLeftAnim, goalieRightAnim;
 let state = 'aim';
 let cursorX = 0;
 let hasCelebrated = false;
+let timeUniform = { value: 0 };
 
 const clock = new THREE.Clock();
 const textureLoader = new THREE.TextureLoader();
@@ -65,12 +66,44 @@ function init() {
   const ballTex = textureLoader.load('textures/ballon.png');
   const bumpMap = textureLoader.load('textures/ballon_bump.jpg');
   ball = new THREE.Mesh(
-    new THREE.SphereGeometry(0.25, 32, 32),
+    new THREE.SphereGeometry(0.22, 32, 32),
     new THREE.MeshStandardMaterial({ map: ballTex, bumpMap: bumpMap, bumpScale: 0.05 })
   );
   ball.position.set(-17.3, -2.5, 36.2);
   ball.castShadow = true;
   scene.add(ball);
+
+  const glowShaderMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      time: timeUniform
+    },
+    vertexShader: `
+      varying vec3 vNormal;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float time;
+      varying vec3 vNormal;
+      void main() {
+        float intensity = pow(0.7 - dot(vNormal, vec3(0, 0, 1.0)), 2.0);
+        float pulse = 0.5 + 0.5 * sin(time * 3.0);
+        gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0) * intensity * pulse;
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+
+  glowBall = new THREE.Mesh(
+    new THREE.SphereGeometry(0.23, 32, 32),
+    glowShaderMaterial
+  );
+  glowBall.position.copy(ball.position);
+  scene.add(glowBall);
 
   const loader = new GLTFLoader();
   loader.load('models/Soccer Penalty Kick.glb', gltf => {
@@ -158,6 +191,7 @@ function playKick() {
 function reset() {
   ballVelocity.set(0, 0, 0);
   ball.position.set(-17.3, -2.5, 36.2);
+  glowBall.position.copy(ball.position);
   ball.rotation.set(0, 0, 0);
   cursorX = 0;
   state = 'aim';
@@ -169,11 +203,14 @@ function reset() {
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
+  timeUniform.value += delta;
+
   if (playerMixer) playerMixer.update(delta);
   if (goalieMixer) goalieMixer.update(delta);
 
   if (state === 'shooting') {
     ball.position.add(ballVelocity);
+    glowBall.position.copy(ball.position);
     ballVelocity.multiplyScalar(0.98);
     const rotationSpeed = 30;
     ball.rotation.x += ballVelocity.length() * delta * rotationSpeed;
