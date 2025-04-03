@@ -9,7 +9,7 @@ let scene, camera, renderer, controls, composer;
 let ball, glowBall, ballVelocity = new THREE.Vector3();
 let playerModel, goalieModel;
 let playerMixer, goalieMixer;
-let kickAnim, celebrateAnim, goalieIdleAnim, goalieLeftAnim, goalieRightAnim;
+let kickAnim, celebrateAnim, playerIdleAnim, goalieIdleAnim, goalieLeftAnim, goalieRightAnim;
 let state = 'aim';
 let cursorX = 0;
 let hasCelebrated = false;
@@ -119,6 +119,14 @@ function init() {
     celebrateAnim.clampWhenFinished = true;
   });
 
+  loader.load('models/Soccer Idle.glb', gltf => {
+    const idleAnim = gltf.animations[0];
+    if (idleAnim) {
+      playerIdleAnim = playerMixer.clipAction(idleAnim);
+      playerIdleAnim.play();
+    }
+  });
+
   loader.load('models/Goalkeeper Idle.glb', gltf => {
     goalieModel = gltf.scene;
     goalieModel.position.set(-22, -2.9, 36.5);
@@ -161,6 +169,10 @@ function playKick() {
   state = 'shooting';
   hasCelebrated = false;
 
+  if (playerIdleAnim) {
+    playerIdleAnim.stop();
+  }
+
   if (kickAnim && playerMixer) {
     playerMixer.stopAllAction();
     kickAnim.reset().play();
@@ -198,6 +210,9 @@ function reset() {
   hasCelebrated = false;
   goalieMixer.stopAllAction();
   goalieIdleAnim?.reset().play();
+  if (playerIdleAnim) {
+    playerIdleAnim.reset().play();
+  }
 }
 
 function animate() {
