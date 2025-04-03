@@ -1,3 +1,4 @@
+
 import * as THREE from 'https://esm.sh/three@0.150.1';
 import { GLTFLoader } from 'https://esm.sh/three@0.150.1/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'https://esm.sh/three@0.150.1/examples/jsm/controls/OrbitControls.js';
@@ -42,7 +43,6 @@ function init() {
   dirLight.castShadow = true;
   scene.add(ambient, dirLight);
 
-  // Terrain
   const gltfLoader = new GLTFLoader();
   gltfLoader.load('models/football_field.glb', gltf => {
     const field = gltf.scene;
@@ -55,7 +55,6 @@ function init() {
     scene.add(field);
   });
 
-  // Ballon
   const ballTex = textureLoader.load('textures/ballon.png');
   ball = new THREE.Mesh(
     new THREE.SphereGeometry(0.25, 32, 32),
@@ -65,7 +64,6 @@ function init() {
   ball.castShadow = true;
   scene.add(ball);
 
-  // Joueur
   const loader = new GLTFLoader();
   loader.load('models/Soccer Penalty Kick.glb', gltf => {
     playerModel = gltf.scene;
@@ -80,7 +78,6 @@ function init() {
     celebrateAnim.clampWhenFinished = true;
   });
 
-  // Gardien
   loader.load('models/Goalkeeper Idle.glb', gltf => {
     goalieModel = gltf.scene;
     goalieModel.position.set(-22, -2.9, 36.5);
@@ -95,11 +92,11 @@ function init() {
   loader.load('models/Goalkeeper Diving Save Left.glb', gltf => {
     goalieLeftAnim = gltf.animations[0];
   });
+
   loader.load('models/Goalkeeper Diving Save Right.glb', gltf => {
     goalieRightAnim = gltf.animations[0];
   });
 
-  // Contrôles clavier
   window.addEventListener('keydown', e => {
     if (state === 'aim') {
       if (e.code === 'ArrowLeft') cursorX = Math.max(-3, cursorX - 0.5);
@@ -128,10 +125,9 @@ function playKick() {
 
     setTimeout(() => {
       if (state === 'shooting') {
-        // Direction ajustée selon cursorX
-        ballVelocity.set(1.5, 0.02, cursorX * 0.05);
+        ballVelocity.set(-1.5, 0.02, cursorX * 0.05);
       }
-    }, 700); // Delay pour correspondre à l'impact
+    }, 700);
   }
 
   const dive = ['left', 'right', 'center'][Math.floor(Math.random() * 3)];
@@ -169,33 +165,10 @@ function animate() {
 
   if (state === 'shooting') {
     ball.position.add(ballVelocity);
-    ballVelocity.multiplyScalar(0.98); // friction
-
+    ballVelocity.multiplyScalar(0.98);
     const rotationSpeed = 30;
     ball.rotation.x += ballVelocity.length() * delta * rotationSpeed;
     ball.rotation.y += ballVelocity.z * delta * rotationSpeed;
-
-    const goalieX = goalieModel?.position?.x || 0;
-    const hitX = ball.position.x;
-    const blocked = Math.abs(hitX - goalieX) < 1.2;
-    const isOnTarget = Math.abs(ball.position.z - 36.5) <= 3.5 && ball.position.y <= 2.5;
-
-    if (blocked && ball.position.x > goalieX && ballVelocity.x > 0) {
-      ballVelocity.z += (Math.random() - 0.5) * 0.2;
-      ballVelocity.y = 0.05;
-      ballVelocity.x *= -0.3;
-    }
-
-    if (ball.position.x > 30 || ball.position.y < -1 || Math.abs(ball.position.z - 36.5) > 10) {
-      ballVelocity.set(0, 0, 0);
-      state = 'ready';
-
-      if (!blocked && isOnTarget && !hasCelebrated) {
-        hasCelebrated = true;
-        playerMixer.stopAllAction();
-        celebrateAnim?.reset().play();
-      }
-    }
   }
 
   renderer.render(scene, camera);
